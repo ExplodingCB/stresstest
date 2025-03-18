@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Stress Test</title>
+  <link rel="icon" href="data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><linearGradient id='cube-top-gradient' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='rgba(255,255,255,0.9)'/><stop offset='100%' stop-color='rgba(220,220,220,0.7)'/></linearGradient><linearGradient id='cube-right-gradient' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='rgba(220,220,220,0.7)'/><stop offset='100%' stop-color='rgba(180,180,180,0.5)'/></linearGradient><linearGradient id='cube-left-gradient' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='rgba(180,180,180,0.5)'/><stop offset='100%' stop-color='rgba(50,50,50,0.8)'/></linearGradient></defs><path d='M12,2L3,7L12,12L21,7L12,2Z' fill='url(%23cube-top-gradient)'/><path d='M21,7L12,12L12,22L21,17L21,7Z' fill='url(%23cube-right-gradient)'/><path d='M3,7L12,12L12,22L3,17L3,7Z' fill='url(%23cube-left-gradient)'/><path d='M12,2L3,7V17L12,22L21,17V7L12,2Z' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='0.5'/></svg>" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="scene" id="scene">
+    <!-- Grid floor and walls for 3D reference -->
+    <div class="grid"></div>
+    <div class="grid-wall-left"></div>
+    <div class="grid-wall-right"></div>
+    <div class="floor"></div>
+    
+    <!-- Shapes will be dynamically created here -->
+  </div>
+
+  <!-- Control Panel -->
+  <div class="control-panel">
+    <div class="slider-container">
+      <div class="slider-label">
+        <span>Object Count</span>
+        <span id="object-count-value">100</span>
+      </div>
+      <input type="range" min="10" max="1000" value="100" class="slider" id="object-count">
+    </div>
+    
+    <div class="slider-container">
+      <div class="slider-label">
+        <span>Physics Complexity</span>
+        <span id="physics-complexity-value">50%</span>
+      </div>
+      <input type="range" min="1" max="100" value="50" class="slider" id="physics-complexity">
+    </div>
+    
+    <div class="slider-container">
+      <div class="slider-label">
+        <span>Visual Complexity</span>
+        <span id="visual-complexity-value">50%</span>
+      </div>
+      <input type="range" min="1" max="100" value="50" class="slider" id="visual-complexity">
+    </div>
+    
+    <div class="control-row">
+      <button class="start-button" id="start-button">START STRESS TEST</button>
+    </div>
+  </div>
+
+  <!-- Stats Panel -->
+  <div class="stats-panel" id="stats-panel">
+    <div class="stats-row">
+      <span>FPS:</span>
+      <span class="stats-value" id="fps-value">--</span>
+    </div>
+    <div class="stats-row">
+      <span>Objects:</span>
+      <span class="stats-value" id="object-count-stat">--</span>
+    </div>
+    <div class="stats-row">
+      <span>Time:</span>
+      <span class="stats-value" id="time-elapsed">0s</span>
+    </div>
+    <div class="score-container">
+      <div class="score-label">PERFORMANCE SCORE</div>
+      <span class="score-value" id="score-value">--</span>
+    </div>
+  </div>
+
+  <!-- Results Overlay -->
+  <div class="result-overlay" id="result-overlay">
+    <div class="result-title">Stress Test Complete</div>
+    <div class="result-score" id="final-score">87</div>
+    <div class="result-details">
+      <div class="result-detail">
+        <div class="result-label">AVG FPS</div>
+        <div class="result-value" id="result-fps">59.8</div>
+      </div>
+      <div class="result-detail">
+        <div class="result-label">MIN FPS</div>
+        <div class="result-value" id="result-min-fps">42.3</div>
+      </div>
+      <div class="result-detail">
+        <div class="result-label">OBJECTS</div>
+        <div class="result-value" id="result-objects">350</div>
+      </div>
+      <div class="result-detail">
+        <div class="result-label">DURATION</div>
+        <div class="result-value" id="result-duration">30s</div>
+      </div>
+    </div>
+    <button class="result-close" id="result-close">CLOSE</button>
+  </div>
+
+  <!-- Loading Indicator -->
+  <div class="loading-indicator" id="loading-indicator">Creating objects...</div>
+
+  <script src="script.js"></script>
+</body>
+</html>
