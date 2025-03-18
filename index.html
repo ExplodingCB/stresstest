@@ -5,7 +5,445 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3D Stress Test</title>
   <link rel="icon" href="data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><linearGradient id='cube-top-gradient' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='rgba(255,255,255,0.9)'/><stop offset='100%' stop-color='rgba(220,220,220,0.7)'/></linearGradient><linearGradient id='cube-right-gradient' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='rgba(220,220,220,0.7)'/><stop offset='100%' stop-color='rgba(180,180,180,0.5)'/></linearGradient><linearGradient id='cube-left-gradient' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='rgba(180,180,180,0.5)'/><stop offset='100%' stop-color='rgba(50,50,50,0.8)'/></linearGradient></defs><path d='M12,2L3,7L12,12L21,7L12,2Z' fill='url(%23cube-top-gradient)'/><path d='M21,7L12,12L12,22L21,17L21,7Z' fill='url(%23cube-right-gradient)'/><path d='M3,7L12,12L12,22L3,17L3,7Z' fill='url(%23cube-left-gradient)'/><path d='M12,2L3,7V17L12,22L21,17V7L12,2Z' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='0.5'/></svg>" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+  <style>
+    :root {
+      --primary-color: #00c6ff;
+      --secondary-color: #0072ff;
+      --danger-color: #ff2f74;
+      --panel-bg: rgba(30, 30, 30, 0.8);
+      --panel-border: rgba(255, 255, 255, 0.2);
+    }
+    
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: black;
+      font-family: 'Arial', sans-serif;
+      color: white;
+    }
+    
+    /* For CSS 3D Scene */
+    .scene {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      perspective: 1200px;
+      overflow: hidden;
+      transform-style: preserve-3d;
+      -webkit-transform-style: preserve-3d;
+      z-index: 1;
+    }
+    
+    .grid {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(rgba(50, 50, 255, 0.2) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(50, 50, 255, 0.2) 1px, transparent 1px);
+      background-size: 50px 50px;
+      transform: rotateX(90deg) translateZ(0);
+      backface-visibility: hidden;
+      opacity: 0.3;
+    }
+    
+    .grid-wall-left {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(rgba(50, 255, 50, 0.1) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(50, 255, 50, 0.1) 1px, transparent 1px);
+      background-size: 50px 50px;
+      transform: rotateY(90deg) translateZ(-50vw);
+      backface-visibility: hidden;
+      opacity: 0.1;
+    }
+    
+    .grid-wall-right {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(rgba(255, 50, 50, 0.1) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(255, 50, 50, 0.1) 1px, transparent 1px);
+      background-size: 50px 50px;
+      transform: rotateY(90deg) translateZ(50vw);
+      backface-visibility: hidden;
+      opacity: 0.1;
+    }
+    
+    .floor {
+      position: absolute;
+      width: 150%;
+      height: 150%;
+      left: -25%;
+      top: -25%;
+      background: linear-gradient(135deg, rgba(0, 20, 60, 0.8), rgba(0, 10, 40, 0.9));
+      transform: rotateX(90deg) translateZ(50vh);
+      backface-visibility: hidden;
+    }
+    
+    .shape-container {
+      position: absolute;
+      transform-style: preserve-3d;
+      -webkit-transform-style: preserve-3d;
+      pointer-events: none;
+    }
+    
+    .hexecontahedron {
+      position: relative;
+      transform-style: preserve-3d;
+      -webkit-transform-style: preserve-3d;
+      will-change: transform;
+    }
+    
+    .hexecontahedron-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      transform-origin: center;
+      -webkit-transform-origin: center;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 3px;
+      box-shadow: 0 0 5px rgba(0, 200, 255, 0.5);
+      will-change: transform;
+    }
+    
+    /* WebGL Canvas */
+    canvas {
+      display: none;
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* Control Panel */
+    .control-panel {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      background: var(--panel-bg);
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--panel-border);
+      width: 320px;
+      max-width: 90vw;
+    }
+    
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+    
+    .start-button {
+      width: 100%;
+      height: 50px;
+      border-radius: 25px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      border: none;
+      color: white;
+      transition: all 0.3s ease;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    }
+    
+    .start-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+      filter: brightness(1.1);
+    }
+    
+    .start-button:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+    }
+    
+    .start-button.running {
+      background: linear-gradient(135deg, #ff5e62, var(--danger-color));
+    }
+    
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      gap: 5px;
+    }
+    
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+    
+    .slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: #2c2c2c;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--secondary-color);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--secondary-color);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      background: var(--primary-color);
+    }
+    
+    /* Stats Display */
+    .stats-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--panel-bg);
+      padding: 15px;
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 180px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+    
+    .stats-value {
+      font-weight: bold;
+    }
+    
+    .fps-good {
+      color: #00ff00;
+    }
+    
+    .fps-medium {
+      color: #ffff00;
+    }
+    
+    .fps-bad {
+      color: #ff0000;
+    }
+    
+    .score-container {
+      text-align: center;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .score-label {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-bottom: 5px;
+    }
+    
+    .score-value {
+      font-size: 24px;
+      font-weight: bold;
+      display: block;
+      text-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+    }
+    
+    /* Mode Toggle Switch */
+    .mode-toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .mode-toggle {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 20px;
+      padding: 3px;
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .mode-toggle-option {
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      z-index: 1;
+      transition: color 0.3s ease;
+    }
+    
+    .mode-toggle-option.active {
+      color: #000;
+    }
+    
+    .mode-toggle-slider {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      height: calc(100% - 6px);
+      width: calc(50% - 3px);
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      border-radius: 16px;
+      transition: transform 0.3s ease;
+    }
+    
+    .mode-toggle[data-mode="gpu"] .mode-toggle-slider {
+      transform: translateX(100%);
+    }
+    
+    /* Result Overlay */
+    .result-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1s ease;
+    }
+    
+    .result-overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+    
+    .result-title {
+      font-size: 36px;
+      margin-bottom: 20px;
+      text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+    }
+    
+    .result-score {
+      font-size: 72px;
+      font-weight: bold;
+      margin-bottom: 30px;
+      color: cyan;
+      text-shadow: 0 0 30px rgba(0, 255, 255, 0.8);
+    }
+    
+    .result-details {
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+    
+    .result-detail {
+      text-align: center;
+      margin: 0 10px 15px;
+    }
+    
+    .result-label {
+      font-size: 14px;
+      opacity: 0.7;
+      margin-bottom: 5px;
+    }
+    
+    .result-value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+    
+    .result-close {
+      padding: 12px 30px;
+      font-size: 16px;
+      border-radius: 25px;
+      background: rgba(0, 200, 255, 0.3);
+      border: 1px solid rgba(0, 200, 255, 0.5);
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .result-close:hover {
+      background: rgba(0, 200, 255, 0.5);
+      transform: translateY(-2px);
+    }
+    
+    /* Loading Indicator */
+    .loading-indicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px 40px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    
+    .loading-indicator.visible {
+      opacity: 1;
+    }
+    
+    /* Mode-specific sliders */
+    .cpu-only {
+      transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+      max-height: 1000px;
+      opacity: 1;
+      overflow: hidden;
+    }
+    
+    .hidden-control {
+      max-height: 0;
+      opacity: 0;
+      margin: 0 !important;
+      padding: 0;
+    }
+  </style>
 </head>
 <body>
   <div class="scene" id="scene">
@@ -28,7 +466,7 @@
       <input type="range" min="10" max="1000" value="100" class="slider" id="object-count">
     </div>
     
-    <div class="slider-container">
+    <div class="slider-container cpu-only" id="physics-complexity-container">
       <div class="slider-label">
         <span>Physics Complexity</span>
         <span id="physics-complexity-value">50%</span>
@@ -36,7 +474,7 @@
       <input type="range" min="1" max="100" value="50" class="slider" id="physics-complexity">
     </div>
     
-    <div class="slider-container">
+    <div class="slider-container cpu-only" id="visual-complexity-container">
       <div class="slider-label">
         <span>Visual Complexity</span>
         <span id="visual-complexity-value">50%</span>
@@ -67,6 +505,15 @@
       <div class="score-label">PERFORMANCE SCORE</div>
       <span class="score-value" id="score-value">--</span>
     </div>
+    
+    <!-- Mode Toggle Switch -->
+    <div class="mode-toggle-container">
+      <div class="mode-toggle" id="mode-toggle" data-mode="cpu">
+        <div class="mode-toggle-slider"></div>
+        <div class="mode-toggle-option active" id="cpu-option">CPU</div>
+        <div class="mode-toggle-option" id="gpu-option">GPU</div>
+      </div>
+    </div>
   </div>
 
   <!-- Results Overlay -->
@@ -90,6 +537,10 @@
         <div class="result-label">DURATION</div>
         <div class="result-value" id="result-duration">30s</div>
       </div>
+      <div class="result-detail">
+        <div class="result-label">MODE</div>
+        <div class="result-value" id="result-mode">CPU</div>
+      </div>
     </div>
     <button class="result-close" id="result-close">CLOSE</button>
   </div>
@@ -97,6 +548,1091 @@
   <!-- Loading Indicator -->
   <div class="loading-indicator" id="loading-indicator">Creating objects...</div>
 
-  <script src="script.js"></script>
+  <!-- Three.js library (for WebGL mode) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <!-- Combined script -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // === SHARED VARIABLES AND ELEMENTS ===
+      
+      // Cache DOM elements
+      const scene = document.getElementById('scene');
+      const startButton = document.getElementById('start-button');
+      const objectCountSlider = document.getElementById('object-count');
+      const objectCountValue = document.getElementById('object-count-value');
+      const physicsComplexitySlider = document.getElementById('physics-complexity');
+      const physicsComplexityValue = document.getElementById('physics-complexity-value');
+      const visualComplexitySlider = document.getElementById('visual-complexity');
+      const visualComplexityValue = document.getElementById('visual-complexity-value');
+      const fpsValue = document.getElementById('fps-value');
+      const objectCountStat = document.getElementById('object-count-stat');
+      const timeElapsed = document.getElementById('time-elapsed');
+      const scoreValue = document.getElementById('score-value');
+      const resultOverlay = document.getElementById('result-overlay');
+      const finalScore = document.getElementById('final-score');
+      const resultFps = document.getElementById('result-fps');
+      const resultMinFps = document.getElementById('result-min-fps');
+      const resultObjects = document.getElementById('result-objects');
+      const resultDuration = document.getElementById('result-duration');
+      const resultMode = document.getElementById('result-mode');
+      const resultClose = document.getElementById('result-close');
+      const loadingIndicator = document.getElementById('loading-indicator');
+      const modeToggle = document.getElementById('mode-toggle');
+      const cpuOption = document.getElementById('cpu-option');
+      const gpuOption = document.getElementById('gpu-option');
+      const physicsComplexityContainer = document.getElementById('physics-complexity-container');
+      const visualComplexityContainer = document.getElementById('visual-complexity-container');
+      
+      // Mode switching variables
+      let currentMode = 'cpu'; // 'cpu' or 'gpu'
+      let canvasInitialized = false;
+      
+      // Simulation variables
+      let isRunning = false;
+      let animationId = null;
+      let startTime = 0;
+      let frameCount = 0;
+      let lastFrameTime = 0;
+      let fps = 0;
+      let fpsHistory = [];
+      let lastFpsUpdateTime = 0;
+      let score = 0;
+      
+      // Objects arrays for both implementations
+      let cpuObjects = [];
+      let gpuObjects = [];
+      
+      // WebGL specific variables
+      let threeRenderer, threeScene, threeCamera;
+      let cubeRenderTarget, cubeCamera;
+      
+      // === MODE SWITCHING LOGIC ===
+      
+      // Initialize the correct mode
+      function initializeMode(mode) {
+        currentMode = mode;
+        modeToggle.dataset.mode = mode;
+        
+        if (mode === 'cpu') {
+          // Show CPU-specific controls
+          physicsComplexityContainer.classList.remove('hidden-control');
+          visualComplexityContainer.classList.remove('hidden-control');
+          
+          // Hide WebGL canvas if it exists and show the CSS scene
+          if (threeRenderer) {
+            threeRenderer.domElement.style.display = 'none';
+          }
+          scene.style.display = 'block';
+          
+          // Force reset perspective and transform style
+          scene.style.perspective = '1200px';
+          scene.style.transformStyle = 'preserve-3d';
+          scene.style.webkitTransformStyle = 'preserve-3d';
+          
+          // Update object count slider max value for CPU
+          objectCountSlider.max = '1000';
+          if (parseInt(objectCountSlider.value) > 1000) {
+            objectCountSlider.value = '1000';
+            objectCountValue.textContent = '1000';
+          }
+          
+          cpuOption.classList.add('active');
+          gpuOption.classList.remove('active');
+          
+          // Make sure the grid is visible
+          const grid = document.querySelector('.grid');
+          const floor = document.querySelector('.floor');
+          if (grid) grid.style.opacity = '0.3';
+          if (floor) floor.style.opacity = '1';
+          
+        } else {
+          // Hide CPU-specific controls
+          physicsComplexityContainer.classList.add('hidden-control');
+          visualComplexityContainer.classList.add('hidden-control');
+          
+          // Initialize WebGL if needed
+          if (!threeRenderer) {
+            initWebGL();
+          }
+          
+          // Show WebGL canvas and hide CSS scene
+          threeRenderer.domElement.style.display = 'block';
+          scene.style.display = 'none';
+          
+          // Update object count slider for GPU mode (higher limit)
+          objectCountSlider.max = '100000';
+          
+          cpuOption.classList.remove('active');
+          gpuOption.classList.add('active');
+        }
+        
+        // Force a full redraw
+        document.body.offsetHeight;
+      }
+      
+      // Handle mode toggle click
+      modeToggle.addEventListener('click', function() {
+        if (isRunning) {
+          // Stop current simulation before switching
+          stopSimulation();
+        }
+        
+        const newMode = currentMode === 'cpu' ? 'gpu' : 'cpu';
+        initializeMode(newMode);
+      });
+      
+      // === CPU MODE (CSS 3D) IMPLEMENTATION ===
+      
+      // Physics configuration for CPU mode
+      const cpuPhysicsConfig = {
+        gravity: 0.3,
+        damping: 0.98,
+        friction: 0.97,
+        minVelocity: 0.01,
+        collisionDamping: 0.7,
+        maximumVelocity: 15,
+        turbulence: 0.01,
+        floorY: window.innerHeight / 2,
+        floorRestitution: 0.7
+      };
+      
+      // Container bounds for CPU mode
+      const cpuBounds = {
+        minX: -window.innerWidth / 2,
+        maxX: window.innerWidth / 2,
+        minY: -window.innerHeight / 2,
+        maxY: window.innerHeight / 2,
+        minZ: -window.innerWidth / 2,
+        maxZ: window.innerWidth / 2,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        depth: window.innerWidth
+      };
+      
+      // Update slider value displays
+      objectCountSlider.addEventListener('input', function() {
+        objectCountValue.textContent = this.value;
+      });
+      
+      physicsComplexitySlider.addEventListener('input', function() {
+        physicsComplexityValue.textContent = this.value + '%';
+      });
+      
+      visualComplexitySlider.addEventListener('input', function() {
+        visualComplexityValue.textContent = this.value + '%';
+      });
+      
+      // CPU: Create a hexecontahedron object
+      function createHexecontahedron(size, faceCount) {
+        const container = document.createElement('div');
+        container.className = 'shape-container';
+        
+        const hexecontahedron = document.createElement('div');
+        hexecontahedron.className = 'hexecontahedron';
+        hexecontahedron.style.width = size + 'px';
+        hexecontahedron.style.height = size + 'px';
+        
+        // Create the faces
+        for (let i = 0; i < faceCount; i++) {
+          const face = document.createElement('div');
+          face.className = 'hexecontahedron-face';
+          face.style.width = size + 'px';
+          face.style.height = size + 'px';
+          
+          // Use a combination of rotation angles to distribute faces evenly
+          const longitude = (i % 10) * 36;  // 10 points around, each 36 degrees
+          const latitude = Math.floor(i / 10) * 30 - 75; // 6 layers, each 30 degrees, offset to center
+          
+          // Adjust hue for a nice gradient of colors
+          const hue = (i * 6) % 360;
+          face.style.background = `linear-gradient(135deg, 
+                                 hsla(${hue}, 100%, 70%, 0.8), 
+                                 hsla(${hue + 40}, 100%, 50%, 0.8))`;
+          
+          // Apply transform to arrange faces in a spherical pattern
+          face.style.transform = `rotateY(${longitude}deg) rotateX(${latitude}deg) translateZ(${size / 2}px)`;
+          
+          hexecontahedron.appendChild(face);
+        }
+        
+        container.appendChild(hexecontahedron);
+        return container;
+      }
+      
+      // CPU: Create a physics object
+      function createCpuPhysicsObject(complexity) {
+        // Determine size and face count based on complexity
+        const size = 20 + Math.random() * 20 * (complexity / 100);
+        const faceCount = Math.max(10, Math.floor(60 * (complexity / 100)));
+        
+        // Create visual element
+        const element = createHexecontahedron(size, faceCount);
+        scene.appendChild(element);
+        
+        // Position objects only within the visible screen area
+        const position = {
+          x: (Math.random() - 0.5) * cpuBounds.width * 0.5, 
+          y: cpuBounds.minY + (Math.random() * cpuBounds.height * 0.3),
+          z: (Math.random() - 0.5) * cpuBounds.depth * 0.4
+        };
+        
+        // Random velocity - with slight downward bias
+        const velocity = {
+          x: (Math.random() - 0.5) * 3,
+          y: Math.random() * 3,
+          z: (Math.random() - 0.5) * 3
+        };
+        
+        // Random rotation
+        const rotation = {
+          x: Math.random() * 360,
+          y: Math.random() * 360,
+          z: Math.random() * 360
+        };
+        
+        // Random rotation velocity
+        const rotationVel = {
+          x: (Math.random() - 0.5) * 3,
+          y: (Math.random() - 0.5) * 3,
+          z: (Math.random() - 0.5) * 3
+        };
+        
+        // Object properties
+        return {
+          element,
+          position,
+          velocity,
+          rotation,
+          rotationVel,
+          size,
+          mass: size * size * size / 1000,
+          restitution: 0.7 + Math.random() * 0.3,
+          lastBounce: 0
+        };
+      }
+      
+      // CPU: Update physics
+      function updateCpuPhysics(obj, deltaTime, complexity) {
+        // Scale delta time to avoid huge jumps
+        const dt = Math.min(deltaTime, 33) / 16;
+        
+        // Apply gravity (positive y is down in our system)
+        obj.velocity.y += cpuPhysicsConfig.gravity * dt;
+        
+        // Apply turbulence based on complexity
+        if (complexity > 20) {
+          const turbulenceStrength = cpuPhysicsConfig.turbulence * (complexity / 100);
+          obj.velocity.x += (Math.random() - 0.5) * turbulenceStrength * dt;
+          obj.velocity.y += (Math.random() - 0.5) * turbulenceStrength * dt;
+          obj.velocity.z += (Math.random() - 0.5) * turbulenceStrength * dt;
+        }
+        
+        // Apply damping
+        obj.velocity.x *= Math.pow(cpuPhysicsConfig.damping, dt);
+        obj.velocity.y *= Math.pow(cpuPhysicsConfig.damping, dt);
+        obj.velocity.z *= Math.pow(cpuPhysicsConfig.damping, dt);
+        
+        // Apply rotation
+        obj.rotation.x += obj.rotationVel.x * dt;
+        obj.rotation.y += obj.rotationVel.y * dt;
+        obj.rotation.z += obj.rotationVel.z * dt;
+        
+        // Clamp velocities to prevent explosion
+        const speedSquared = obj.velocity.x * obj.velocity.x + 
+                           obj.velocity.y * obj.velocity.y + 
+                           obj.velocity.z * obj.velocity.z;
+                            
+        if (speedSquared > cpuPhysicsConfig.maximumVelocity * cpuPhysicsConfig.maximumVelocity) {
+          const factor = cpuPhysicsConfig.maximumVelocity / Math.sqrt(speedSquared);
+          obj.velocity.x *= factor;
+          obj.velocity.y *= factor;
+          obj.velocity.z *= factor;
+        }
+        
+        // Update position
+        obj.position.x += obj.velocity.x * dt;
+        obj.position.y += obj.velocity.y * dt;
+        obj.position.z += obj.velocity.z * dt;
+        
+        // Boundary collision checks
+        
+        // X bounds
+        if (obj.position.x - obj.size/2 < cpuBounds.minX) {
+          obj.position.x = cpuBounds.minX + obj.size/2;
+          obj.velocity.x = Math.abs(obj.velocity.x) * obj.restitution;
+          obj.rotationVel.z -= obj.velocity.y * 0.1 * dt;
+        } else if (obj.position.x + obj.size/2 > cpuBounds.maxX) {
+          obj.position.x = cpuBounds.maxX - obj.size/2;
+          obj.velocity.x = -Math.abs(obj.velocity.x) * obj.restitution;
+          obj.rotationVel.z += obj.velocity.y * 0.1 * dt;
+        }
+        
+        // Floor collision (positive Y is down in our coordinate system)
+        const currentTime = performance.now();
+        if (obj.position.y + obj.size/2 > cpuBounds.maxY) {
+          obj.position.y = cpuBounds.maxY - obj.size/2;
+          
+          // Only bounce if coming down with sufficient speed
+          if (obj.velocity.y > 0.1) {
+            // Record this bounce
+            obj.lastBounce = currentTime;
+            
+            // Bounce with floor
+            obj.velocity.y = -Math.abs(obj.velocity.y) * obj.restitution * cpuPhysicsConfig.floorRestitution;
+            
+            // Add some spin based on horizontal velocity
+            obj.rotationVel.x += obj.velocity.z * 0.2 * dt;
+            obj.rotationVel.z -= obj.velocity.x * 0.2 * dt;
+            
+            // Apply friction to horizontal velocity when bouncing
+            obj.velocity.x *= cpuPhysicsConfig.friction;
+            obj.velocity.z *= cpuPhysicsConfig.friction;
+          } else {
+            // If very slow, stop vertical movement to rest on floor
+            obj.velocity.y = 0;
+            
+            // Apply more friction when resting on floor
+            obj.velocity.x *= cpuPhysicsConfig.friction * 0.95;
+            obj.velocity.z *= cpuPhysicsConfig.friction * 0.95;
+            
+            // Slow down rotation when at rest
+            obj.rotationVel.x *= 0.95;
+            obj.rotationVel.y *= 0.98;
+            obj.rotationVel.z *= 0.95;
+          }
+        }
+        
+        // Ceiling collision
+        if (obj.position.y - obj.size/2 < cpuBounds.minY) {
+          obj.position.y = cpuBounds.minY + obj.size/2;
+          obj.velocity.y = Math.abs(obj.velocity.y) * obj.restitution;
+        }
+        
+        // Z bounds
+        if (obj.position.z - obj.size/2 < cpuBounds.minZ) {
+          obj.position.z = cpuBounds.minZ + obj.size/2;
+          obj.velocity.z = Math.abs(obj.velocity.z) * obj.restitution;
+          obj.rotationVel.x += obj.velocity.y * 0.1 * dt;
+        } else if (obj.position.z + obj.size/2 > cpuBounds.maxZ) {
+          obj.position.z = cpuBounds.maxZ - obj.size/2;
+          obj.velocity.z = -Math.abs(obj.velocity.z) * obj.restitution;
+          obj.rotationVel.x -= obj.velocity.y * 0.1 * dt;
+        }
+        
+        // Object collision checks - simplified
+        if (complexity > 40 && cpuObjects.length < 500) {
+          for (let i = 0; i < cpuObjects.length; i++) {
+            const other = cpuObjects[i];
+            if (other === obj) continue;
+            
+            // Calculate distance between objects
+            const dx = other.position.x - obj.position.x;
+            const dy = other.position.y - obj.position.y;
+            const dz = other.position.z - obj.position.z;
+            const distSquared = dx*dx + dy*dy + dz*dz;
+            
+            // Minimum distance for collision
+            const minDist = (obj.size + other.size) / 2;
+            
+            if (distSquared < minDist * minDist) {
+              // Basic collision response - just handle positions
+              const dist = Math.sqrt(distSquared);
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const nz = dz / dist;
+              
+              // Calculate overlap
+              const overlap = minDist - dist;
+              
+              // Adjust positions to resolve overlap
+              obj.position.x -= nx * overlap * 0.5;
+              obj.position.y -= ny * overlap * 0.5;
+              obj.position.z -= nz * overlap * 0.5;
+              
+              other.position.x += nx * overlap * 0.5;
+              other.position.y += ny * overlap * 0.5;
+              other.position.z += nz * overlap * 0.5;
+              
+              // Velocity changes simplified for better performance
+              const dotProduct = 
+                (obj.velocity.x - other.velocity.x) * nx +
+                (obj.velocity.y - other.velocity.y) * ny +
+                (obj.velocity.z - other.velocity.z) * nz;
+              
+              if (dotProduct < 0) {
+                const elasticity = (obj.restitution + other.restitution) / 2;
+                const impulse = dotProduct * elasticity;
+                
+                obj.velocity.x -= impulse * nx;
+                obj.velocity.y -= impulse * ny;
+                obj.velocity.z -= impulse * nz;
+                
+                other.velocity.x += impulse * nx;
+                other.velocity.y += impulse * ny;
+                other.velocity.z += impulse * nz;
+              }
+            }
+          }
+        }
+        
+        // Apply transform to visual element with center offset
+        const offsetX = window.innerWidth / 2;
+        const offsetY = window.innerHeight / 2;
+        
+        // Use separate transform to ensure it renders properly
+        obj.element.style.transform = 
+          `translate3d(${obj.position.x + offsetX}px, ${obj.position.y + offsetY}px, ${obj.position.z}px) ` +
+          `rotateX(${obj.rotation.x}deg) ` +
+          `rotateY(${obj.rotation.y}deg) ` +
+          `rotateZ(${obj.rotation.z}deg)`;
+          
+        // Ensure the element is visible
+        obj.element.style.opacity = "1";
+      }
+      
+      // === WEBGL (GPU) MODE IMPLEMENTATION ===
+      
+      // Initialize WebGL/three.js
+      function initWebGL() {
+        if (canvasInitialized) return;
+        
+        // Create THREE.js scene
+        threeScene = new THREE.Scene();
+        threeScene.background = new THREE.Color(0x000000);
+        
+        // Setup camera
+        threeCamera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 20000);
+        threeCamera.position.set(0, 400, 1200);
+        threeCamera.lookAt(0, 50, 0);
+        
+        // Setup renderer
+        threeRenderer = new THREE.WebGLRenderer({ antialias: true });
+        threeRenderer.setSize(window.innerWidth, window.innerHeight);
+        threeRenderer.setPixelRatio(window.devicePixelRatio);
+        threeRenderer.physicallyCorrectLights = true;
+        document.body.appendChild(threeRenderer.domElement);
+        
+        canvasInitialized = true;
+        
+        // Create environment cubemap for reflections
+        cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256);
+        cubeCamera = new THREE.CubeCamera(1, 1000, cubeRenderTarget);
+        threeScene.add(cubeCamera);
+        
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+        threeScene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        directionalLight.position.set(1, 1, 1).normalize();
+        threeScene.add(directionalLight);
+        
+        const pointLight1 = new THREE.PointLight(0x00ffff, 1, 1000);
+        pointLight1.position.set(200, 100, 200);
+        threeScene.add(pointLight1);
+        
+        const pointLight2 = new THREE.PointLight(0xff00ff, 1, 1000);
+        pointLight2.position.set(-200, 150, -100);
+        threeScene.add(pointLight2);
+        
+        // Create a floor
+        const floorGeometry = new THREE.PlaneGeometry(10000, 10000);
+        const floorMaterial = new THREE.MeshPhysicalMaterial({
+          color: 0x2233aa,
+          metalness: 0.5,
+          roughness: 0.1,
+          envMap: cubeRenderTarget.texture,
+          reflectivity: 1.0,
+          transparent: false,
+          side: THREE.DoubleSide
+        });
+        
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = Math.PI / 2;
+        floor.position.y = 0;
+        threeScene.add(floor);
+        
+        // Add a grid
+        const gridHelper = new THREE.GridHelper(10000, 100, 0x4444ff, 0x4444ff);
+        gridHelper.position.y = 0.1;
+        gridHelper.material.opacity = 0.5;
+        gridHelper.material.transparent = true;
+        threeScene.add(gridHelper);
+        
+        // Add spotlights
+        const spotLight1 = new THREE.SpotLight(0xffffff, 1.5);
+        spotLight1.position.set(0, 1000, 0);
+        spotLight1.angle = Math.PI / 3;
+        spotLight1.penumbra = 0.2;
+        spotLight1.decay = 1.5;
+        spotLight1.distance = 5000;
+        spotLight1.target.position.set(0, 0, 0);
+        threeScene.add(spotLight1);
+        threeScene.add(spotLight1.target);
+        
+        // Hide WebGL canvas initially
+        threeRenderer.domElement.style.display = 'none';
+      }
+      
+      // Container bounds for GPU mode
+      const gpuBounds = {
+        minX: -window.innerWidth * 5,
+        maxX: window.innerWidth * 5,
+        minY: -window.innerHeight * 3,
+        maxY: 0,
+        minZ: -window.innerWidth * 5,
+        maxZ: window.innerWidth * 5,
+        width: window.innerWidth * 10,
+        height: window.innerHeight * 3,
+        depth: window.innerWidth * 10
+      };
+      
+      // Physics configuration for GPU mode
+      const gpuPhysicsConfig = {
+        gravity: 20,
+        damping: 0.99,
+        friction: 0.95,
+        minVelocity: 0.01,
+        collisionDamping: 0.8,
+        maximumVelocity: 40,
+        turbulence: 0.3, 
+        floorY: 0,
+        floorRestitution: 0.9,
+        bounceRandomness: 0.4
+      };
+      
+      // GPU: Create a physics object
+      function createGpuPhysicsObject(complexity) {
+        const size = 15 + Math.random() * 30 * (complexity / 100);
+        
+        // Create sphere geometry - adjust segments based on object count
+        let objectCount = parseInt(objectCountSlider.value);
+        let segmentScale = 1.0;
+        if (objectCount > 50000) segmentScale = 0.3;
+        else if (objectCount > 10000) segmentScale = 0.5;
+        else if (objectCount > 5000) segmentScale = 0.7;
+        
+        let segments = Math.max(8, Math.floor((12 + (complexity / 15)) * segmentScale));
+        const geometry = new THREE.SphereGeometry(size, segments, segments);
+        
+        // Generate a random color
+        const hue = Math.random() * 360;
+        const saturation = 70 + Math.random() * 30;
+        const lightness = 40 + Math.random() * 40;
+        const color = new THREE.Color(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+        
+        // Create material
+        const material = new THREE.MeshPhysicalMaterial({
+          color: color,
+          metalness: 0.5 + Math.random() * 0.5,
+          roughness: Math.random() * 0.4,
+          envMap: cubeRenderTarget.texture,
+          envMapIntensity: 0.8 + Math.random() * 0.4,
+          clearcoat: 0.7 + Math.random() * 0.3,
+          clearcoatRoughness: Math.random() * 0.2,
+          reflectivity: 0.8 + Math.random() * 0.2
+        });
+        
+        // Add emissive glow to some objects
+        if (Math.random() < 0.3) {
+          const emissiveHue = (hue + 180) % 360;
+          material.emissive = new THREE.Color(`hsl(${emissiveHue}, 100%, 30%)`);
+          material.emissiveIntensity = 0.2 + Math.random() * 0.3;
+        }
+        
+        const mesh = new THREE.Mesh(geometry, material);
+        threeScene.add(mesh);
+        
+        // Position
+        const position = {
+          x: (Math.random() * 2 - 1) * window.innerWidth * 2,
+          y: 100 + Math.random() * 500,
+          z: (Math.random() * 2 - 1) * window.innerWidth * 2
+        };
+        mesh.position.set(position.x, position.y, position.z);
+        
+        // Velocity
+        const velocity = {
+          x: (Math.random() * 2 - 1) * 10,
+          y: -20 - Math.random() * 20,
+          z: (Math.random() * 2 - 1) * 10
+        };
+        
+        // Rotation
+        const rotation = {
+          x: Math.random() * 360,
+          y: Math.random() * 360,
+          z: Math.random() * 360
+        };
+        mesh.rotation.set(
+          rotation.x * THREE.MathUtils.DEG2RAD,
+          rotation.y * THREE.MathUtils.DEG2RAD,
+          rotation.z * THREE.MathUtils.DEG2RAD
+        );
+        
+        // Rotation velocity
+        const rotationVel = {
+          x: (Math.random() - 0.5) * 10,
+          y: (Math.random() - 0.5) * 10,
+          z: (Math.random() - 0.5) * 10
+        };
+        
+        return {
+          mesh,
+          position,
+          velocity,
+          rotation,
+          rotationVel,
+          size,
+          mass: size * size * size / 1000,
+          restitution: 0.7 + Math.random() * 0.3,
+          lastBounce: 0,
+          created: performance.now()
+        };
+      }
+      
+      // GPU: Update physics
+      function updateGpuPhysics(obj, deltaTime) {
+        const dt = Math.min(deltaTime, 33) / 16;
+        
+        // Apply gravity
+        obj.velocity.y -= gpuPhysicsConfig.gravity * dt;
+        
+        // Apply damping
+        const dampingFactor = Math.pow(0.998, dt);
+        obj.velocity.x *= dampingFactor;
+        obj.velocity.y *= dampingFactor;
+        obj.velocity.z *= dampingFactor;
+        
+        // Update rotation
+        obj.rotation.x += obj.rotationVel.x * dt;
+        obj.rotation.y += obj.rotationVel.y * dt;
+        obj.rotation.z += obj.rotationVel.z * dt;
+        
+        obj.mesh.rotation.x = obj.rotation.x * THREE.MathUtils.DEG2RAD;
+        obj.mesh.rotation.y = obj.rotation.y * THREE.MathUtils.DEG2RAD;
+        obj.mesh.rotation.z = obj.rotation.z * THREE.MathUtils.DEG2RAD;
+        
+        // Maximum velocity cap
+        const speedSquared = obj.velocity.x * obj.velocity.x + 
+                           obj.velocity.y * obj.velocity.y + 
+                           obj.velocity.z * obj.velocity.z;
+        if (speedSquared > gpuPhysicsConfig.maximumVelocity * gpuPhysicsConfig.maximumVelocity) {
+          const factor = gpuPhysicsConfig.maximumVelocity / Math.sqrt(speedSquared);
+          obj.velocity.x *= factor;
+          obj.velocity.y *= factor;
+          obj.velocity.z *= factor;
+        }
+        
+        // Update position
+        obj.position.x += obj.velocity.x * dt;
+        obj.position.y += obj.velocity.y * dt;
+        obj.position.z += obj.velocity.z * dt;
+        
+        // Simple floor collision
+        if (obj.position.y - obj.size/2 <= 0) {
+          obj.position.y = obj.size/2;
+          if (obj.velocity.y < 0) {
+            obj.velocity.y = Math.abs(obj.velocity.y) * obj.restitution * 0.6;
+            if (obj.velocity.y < 0.5) obj.velocity.y = 0;
+            
+            // Apply friction to horizontal movement
+            obj.velocity.x *= 0.95;
+            obj.velocity.z *= 0.95;
+          }
+        }
+        
+        // Wall collisions
+        if (obj.position.x - obj.size/2 < gpuBounds.minX) {
+          obj.position.x = gpuBounds.minX + obj.size/2;
+          obj.velocity.x = Math.abs(obj.velocity.x) * obj.restitution;
+        } else if (obj.position.x + obj.size/2 > gpuBounds.maxX) {
+          obj.position.x = gpuBounds.maxX - obj.size/2;
+          obj.velocity.x = -Math.abs(obj.velocity.x) * obj.restitution;
+        }
+        
+        if (obj.position.z - obj.size/2 < gpuBounds.minZ) {
+          obj.position.z = gpuBounds.minZ + obj.size/2;
+          obj.velocity.z = Math.abs(obj.velocity.z) * obj.restitution;
+        } else if (obj.position.z + obj.size/2 > gpuBounds.maxZ) {
+          obj.position.z = gpuBounds.maxZ - obj.size/2;
+          obj.velocity.z = -Math.abs(obj.velocity.z) * obj.restitution;
+        }
+        
+        // Update mesh position
+        obj.mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
+      }
+      
+      // GPU: Update the environment cubemap for reflections
+      function updateCubemap() {
+        if (currentMode === 'gpu' && isRunning) {
+          const objectCount = gpuObjects.length;
+          
+          // Update cubemap less frequently with more objects for performance
+          if (objectCount > 5000) {
+            if (Math.random() < 0.05) {
+              cubeCamera.update(threeRenderer, threeScene);
+            }
+          } else if (objectCount > 1000) {
+            if (Math.random() < 0.2) {
+              cubeCamera.update(threeRenderer, threeScene);
+            }
+          } else {
+            cubeCamera.update(threeRenderer, threeScene);
+          }
+          
+          requestAnimationFrame(updateCubemap);
+        }
+      }
+      
+      // === ANIMATION AND SIMULATION LOGIC ===
+      
+      // Handle window resizing
+      function updateBounds() {
+        // Update CSS 3D bounds
+        cpuBounds.width = window.innerWidth;
+        cpuBounds.height = window.innerHeight;
+        cpuBounds.depth = window.innerWidth;
+        
+        cpuBounds.minX = -cpuBounds.width / 2;
+        cpuBounds.maxX = cpuBounds.width / 2;
+        cpuBounds.minY = -cpuBounds.height / 2;
+        cpuBounds.maxY = cpuBounds.height / 2;
+        cpuBounds.minZ = -cpuBounds.depth / 2;
+        cpuBounds.maxZ = cpuBounds.depth / 2;
+        
+        cpuPhysicsConfig.floorY = cpuBounds.maxY;
+        
+        // Update WebGL bounds
+        gpuBounds.width = window.innerWidth * 10;
+        gpuBounds.height = window.innerHeight * 3;
+        gpuBounds.depth = window.innerWidth * 10;
+        
+        gpuBounds.minX = -gpuBounds.width / 2;
+        gpuBounds.maxX = gpuBounds.width / 2;
+        gpuBounds.minY = -gpuBounds.height;
+        gpuBounds.maxY = 0;
+        gpuBounds.minZ = -gpuBounds.depth / 2;
+        gpuBounds.maxZ = gpuBounds.depth / 2;
+        
+        // Update WebGL camera and renderer if initialized
+        if (threeCamera && threeRenderer) {
+          threeCamera.aspect = window.innerWidth / window.innerHeight;
+          threeCamera.updateProjectionMatrix();
+          threeRenderer.setSize(window.innerWidth, window.innerHeight);
+        }
+      }
+      
+      window.addEventListener('resize', updateBounds);
+      
+      // Animation loop for both modes
+      function animate(timestamp) {
+        // First frame timestamp
+        if (!lastFrameTime) {
+          lastFrameTime = timestamp;
+          requestAnimationFrame(animate);
+          return;
+        }
+        
+        // Calculate delta time
+        const deltaTime = timestamp - lastFrameTime;
+        lastFrameTime = timestamp;
+        
+        // Calculate elapsed time
+        const elapsedTime = timestamp - startTime;
+        
+        // Update FPS counter
+        frameCount++;
+        if (timestamp - lastFpsUpdateTime >= 500) { // Update every 500ms
+          fps = Math.round(frameCount / ((timestamp - lastFpsUpdateTime) / 1000));
+          frameCount = 0;
+          lastFpsUpdateTime = timestamp;
+          
+          // Store in history for averaging
+          fpsHistory.push(fps);
+          if (fpsHistory.length > 20) {
+            fpsHistory.shift();
+          }
+          
+          // Update FPS display
+          fpsValue.textContent = fps;
+          if (fps >= 50) {
+            fpsValue.className = 'stats-value fps-good';
+          } else if (fps >= 30) {
+            fpsValue.className = 'stats-value fps-medium';
+          } else {
+            fpsValue.className = 'stats-value fps-bad';
+          }
+          
+          // Calculate score based on FPS and complexity
+          const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
+          
+          if (currentMode === 'cpu') {
+            const objectCount = parseInt(objectCountSlider.value);
+            const physicsComplexity = parseInt(physicsComplexitySlider.value);
+            const visualComplexity = parseInt(visualComplexitySlider.value);
+            
+            // CPU score calculation
+            score = Math.min(100, Math.round(
+              (avgFps / 60) * 100 * 
+              (1 + objectCount / 2000) * 
+              (1 + physicsComplexity / 200) * 
+              (1 + visualComplexity / 200)
+            ));
+          } else {
+            // GPU score is just the average FPS
+            score = Math.round(avgFps);
+          }
+          
+          scoreValue.textContent = score;
+          
+          // Update time display
+          const seconds = Math.floor(elapsedTime / 1000);
+          timeElapsed.textContent = `${seconds}s`;
+          
+          // Check if we should end the test (30 seconds)
+          if (seconds >= 30 && isRunning) {
+            stopSimulation(true);
+          }
+        }
+        
+        // Process animations based on current mode
+        if (currentMode === 'cpu') {
+          // CPU Mode: Update CSS 3D objects
+          const physicsComplexity = parseInt(physicsComplexitySlider.value);
+          
+          for (let i = 0; i < cpuObjects.length; i++) {
+            updateCpuPhysics(cpuObjects[i], deltaTime, physicsComplexity);
+          }
+        } else {
+          // GPU Mode: Update WebGL objects
+          
+          // Add objects gradually if needed
+          const targetObjectCount = parseInt(objectCountSlider.value);
+          if (gpuObjects.length < targetObjectCount) {
+            const secondsElapsed = (timestamp - startTime) / 1000;
+            const remainingObjects = targetObjectCount - gpuObjects.length;
+            
+            if (secondsElapsed < 20) {
+              let spawnRate;
+              if (targetObjectCount > 50000) {
+                spawnRate = Math.max(50, Math.min(500, Math.ceil(remainingObjects / (20 - secondsElapsed))));
+              } else if (targetObjectCount > 10000) {
+                spawnRate = Math.max(20, Math.min(200, Math.ceil(remainingObjects / (20 - secondsElapsed))));
+              } else if (targetObjectCount > 1000) {
+                spawnRate = Math.max(5, Math.min(50, Math.ceil(remainingObjects / (20 - secondsElapsed))));
+              } else {
+                spawnRate = Math.max(1, Math.min(10, Math.ceil(remainingObjects / (20 - secondsElapsed))));
+              }
+              const objectsToAdd = Math.min(spawnRate, remainingObjects);
+              
+              for (let i = 0; i < objectsToAdd; i++) {
+                const obj = createGpuPhysicsObject(100); // Always use max complexity for GPU
+                gpuObjects.push(obj);
+              }
+            }
+            
+            // Update object count display
+            objectCountStat.textContent = gpuObjects.length;
+          }
+          
+          // Physics update optimization for large counts
+          const objectCount = gpuObjects.length;
+          let skipFactor = 1;
+          if (objectCount > 50000) skipFactor = 10;
+          else if (objectCount > 20000) skipFactor = 6;
+          else if (objectCount > 10000) skipFactor = 4;
+          else if (objectCount > 5000) skipFactor = 2;
+          
+          for (let i = 0; i < objectCount; i++) {
+            if (i % skipFactor === frameCount % skipFactor) {
+              updateGpuPhysics(gpuObjects[i], deltaTime);
+            }
+          }
+          
+          // Render scene
+          threeRenderer.render(threeScene, threeCamera);
+        }
+        
+        if (isRunning) {
+          animationId = requestAnimationFrame(animate);
+        }
+      }
+      
+      // Start/Stop button click handler
+      startButton.addEventListener('click', function() {
+        if (isRunning) {
+          stopSimulation();
+        } else {
+          startSimulation();
+        }
+      });
+      
+      // Start simulation
+      function startSimulation() {
+        if (isRunning) return;
+        
+        // Reset variables
+        isRunning = true;
+        startTime = performance.now();
+        lastFrameTime = 0;
+        frameCount = 0;
+        lastFpsUpdateTime = 0;
+        fpsHistory = [];
+        
+        // Update button
+        startButton.textContent = 'STOP TEST';
+        startButton.classList.add('running');
+        
+        // Show loading indicator
+        loadingIndicator.classList.add('visible');
+        
+        if (currentMode === 'cpu') {
+          // Clear any existing objects
+          while (cpuObjects.length > 0) {
+            const obj = cpuObjects.pop();
+            scene.removeChild(obj.element);
+          }
+          
+          // Get settings from controls
+          const objectCount = parseInt(objectCountSlider.value);
+          const visualComplexity = parseInt(visualComplexitySlider.value);
+          
+          // Create objects in batches
+          let created = 0;
+          
+          function createBatch() {
+            const batchSize = 20;
+            const start = created;
+            const end = Math.min(created + batchSize, objectCount);
+            
+            for (let i = start; i < end; i++) {
+              cpuObjects.push(createCpuPhysicsObject(visualComplexity));
+            }
+            
+            created = end;
+            objectCountStat.textContent = created;
+            
+            if (created < objectCount) {
+              // Schedule next batch
+              setTimeout(createBatch, 0);
+            } else {
+              // All objects created, start animation
+              loadingIndicator.classList.remove('visible');
+              animationId = requestAnimationFrame(animate);
+            }
+          }
+          
+          // Start creating objects
+          setTimeout(createBatch, 10);
+          
+        } else {
+          // GPU Mode
+          
+          // Clear existing objects
+          while (gpuObjects.length > 0) {
+            const obj = gpuObjects.pop();
+            threeScene.remove(obj.mesh);
+          }
+          
+          // Start with a small batch
+          const initialBatchSize = Math.min(50, parseInt(objectCountSlider.value));
+          
+          for (let i = 0; i < initialBatchSize; i++) {
+            const obj = createGpuPhysicsObject(100); // Always use max complexity
+            gpuObjects.push(obj);
+          }
+          
+          objectCountStat.textContent = gpuObjects.length;
+          loadingIndicator.classList.remove('visible');
+          
+          // Start animation and cubemap updates
+          animationId = requestAnimationFrame(animate);
+          updateCubemap();
+        }
+      }
+      
+      // Stop simulation
+      function stopSimulation(showResults = false) {
+        if (!isRunning) return;
+        
+        isRunning = false;
+        
+        // Cancel animation
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+        }
+        
+        // Update button
+        startButton.textContent = 'START STRESS TEST';
+        startButton.classList.remove('running');
+        
+        // Calculate final results
+        const elapsedTime = performance.now() - startTime;
+        const seconds = Math.floor(elapsedTime / 1000);
+        
+        // Calculate average FPS
+        const avgFps = fpsHistory.length > 0 ? 
+          (fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length).toFixed(1) : 
+          0;
+        
+        // Calculate min FPS
+        const minFps = fpsHistory.length > 0 ? 
+          Math.min(...fpsHistory).toFixed(1) : 
+          0;
+        
+        // Update result overlay
+        if (showResults) {
+          finalScore.textContent = score;
+          resultFps.textContent = avgFps;
+          resultMinFps.textContent = minFps;
+          
+          // Get object count based on current mode
+          const objectCount = currentMode === 'cpu' ? cpuObjects.length : gpuObjects.length;
+          resultObjects.textContent = objectCount;
+          
+          resultDuration.textContent = `${seconds}s`;
+          resultMode.textContent = currentMode.toUpperCase();
+          
+          // Show results
+          resultOverlay.classList.add('active');
+        }
+      }
+      
+      // Close result overlay
+      resultClose.addEventListener('click', function() {
+        resultOverlay.classList.remove('active');
+      });
+      
+      // Fix z-index and display issues
+      function fixDisplayIssues() {
+        // Ensure CSS scene is visible when in CPU mode
+        if (currentMode === 'cpu') {
+          scene.style.zIndex = '1';
+          scene.style.display = 'block';
+          
+          // Fix the grid floor position
+          const grid = document.querySelector('.grid');
+          if (grid) {
+            grid.style.transformOrigin = 'center center';
+            grid.style.transform = 'rotateX(90deg) translateZ(0)';
+          }
+          
+          // Force GPU acceleration
+          scene.style.transform = 'translateZ(0)';
+          scene.style.webkitTransform = 'translateZ(0)';
+        }
+      }
+      
+      // Initialize
+      updateBounds();
+      initializeMode('cpu'); // Start with CPU mode by default
+      
+      // Fix any display issues after a short delay
+      setTimeout(fixDisplayIssues, 100);
+    });
+  </script>
 </body>
 </html>
